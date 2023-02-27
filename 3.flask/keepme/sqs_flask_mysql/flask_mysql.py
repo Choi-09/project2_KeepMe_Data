@@ -59,19 +59,19 @@ def save_sqs_messages_to_mysql():
                         sql4 = "INSERT INTO state (userId, state) VALUES (%s, %s)"
                         val4 = (message_data[3]['userId'], message_data[3]['state'])
 
-                        sql5 = 'INSERT INTO user (id, pw, name, age, contact, position, role, employDate, workplace) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)'
-                        val5 = (message_data[4]['id'], message_data[4]['pw'],message_data[4]['name'], message_data[4]['age'],message_data[4]['contact'],
-                            message_data[4]['position'], message_data[4]['role'], message_data[4]['employDate'], message_data[4]['workplace'])
+                        # sql5 = 'INSERT INTO user (id, pw, name, age, contact, position, role, employDate, workplace) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)'
+                        # val5 = (message_data[4]['id'], message_data[4]['pw'],message_data[4]['name'], message_data[4]['age'],message_data[4]['contact'],
+                        #     message_data[4]['position'], message_data[4]['role'], message_data[4]['employDate'], message_data[4]['workplace'])
 
                         sql6 = 'INSERT INTO vitalsign (userId, insertTime, heartRate, temp, o2, steps) VALUES (%s, %s, %s, %s, %s, %s)'
-                        val6 = (message_data[5]['userId'], message_data[5]['insertTime'],
-                            message_data[5]['heartRate'], message_data[5]['temp'], message_data[5]['o2'], message_data[5]['steps'])
+                        val6 = (message_data[4]['userId'], message_data[4]['insertTime'],
+                            message_data[4]['heartRate'], message_data[4]['temp'], message_data[4]['o2'], message_data[4]['steps'])
                         
                         cursor.execute(sql1, val1)
                         cursor.execute(sql2, val2)
                         cursor.execute(sql3, val3)
                         cursor.execute(sql4, val4)
-                        cursor.execute(sql5, val5)
+                        # cursor.execute(sql5, val5)
                         cursor.execute(sql6, val6)
                     
                         conn.commit()
@@ -81,3 +81,4 @@ def save_sqs_messages_to_mysql():
                             QueueUrl=queue_url,
                             ReceiptHandle=message['ReceiptHandle'],
                             )
+save_sqs_messages_to_mysql()
