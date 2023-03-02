@@ -1,6 +1,7 @@
 import uuid
 import boto3
 import json
+import asyncio
 
 from faker import Faker
 import random
@@ -11,6 +12,7 @@ import time
 from dotenv import load_dotenv
 import os
 
+
 # MySQL 데이터베이스 설정
 load_dotenv()
 
@@ -18,17 +20,16 @@ load_dotenv()
 sqs = boto3.client('sqs')
 queue_url = os.getenv("queue_url")
 
-
-def send_sqs_messages():   
-    fake= Faker()
+async def send_sqs_messages():   
     # 더미데이터 초기값 설정
     # static 데이터
     worker_id = ['1001', '1002', '1003', '1004', '1005', '1006', '1007', '1008', '1009', '1010']
-    device = ['ph', 'w']
-    state = ""
+    
+    status = ""
+    accuracy =  ""
     # dynamic 데이터 범위 : vital sign
     heart_rate_range = (60, 100)
-    oxygen_saturation_range = (95, 100)
+    oxygen_saturation_range = (89, 100) # 95~100 정상, 90~95 주의, 90이하 위험
     body_temperature_range = (36.0, 37.5)
     step_stride_range = (60, 80)
 
@@ -42,20 +43,14 @@ def send_sqs_messages():
     accelerometer_y_range = (-2, 2)
     accelerometer_z_range = (-2, 2)
 
-    # dynamic 데이터 범위: 나이, 배터리 
-    battery_range = (0, 100)
-
     # Define the standard deviation for the normal distribution of each vital sign
     heart_rate_stddev = 5
     oxygen_saturation_stddev = 1
     body_temperature_stddev = 0.1
     step_stride_stddev = 2
 
-    battery_stddev = 2
-    battery = 100 
-
     while True: 
-        for i in range(len(worker_id)):      
+        for id in worker_id:     
             heart_rate = random.randint(*heart_rate_range)
             oxygen_saturation = random.randint(*oxygen_saturation_range)
             body_temperature = round(random.uniform(*body_temperature_range), 1)
@@ -80,7 +75,8 @@ def send_sqs_messages():
             gyrosensor_z += random.uniform(-0.05, 0.05)
             accelerometer_x += random.uniform(-0.02, 0.02)
             accelerometer_y += random.uniform(-0.02, 0.02)
-            accelerometer_z += random.uniform(-0.02, 0.02)       
+            accelerometer_z += random.uniform(-0.02, 0.02)      
+
             # dynamic 데이터
             heart_rate = max(min(round(heart_rate), heart_rate_range[1]), heart_rate_range[0])
             oxygen_saturation = max(min(round(oxygen_saturation), oxygen_saturation_range[1]), oxygen_saturation_range[0])
@@ -93,70 +89,42 @@ def send_sqs_messages():
             gyrosensor_z = max(min(round(gyrosensor_z, 17), gyrosensor_z_range[1]), gyrosensor_z_range[0])
             accelerometer_x = max(min(round(accelerometer_x, 17), accelerometer_x_range[1]), accelerometer_x_range[0])
             accelerometer_y = max(min(round(accelerometer_y, 17), accelerometer_y_range[1]), accelerometer_y_range[0])
-            accelerometer_z = max(min(round(accelerometer_z, 17), accelerometer_z_range[1]), accelerometer_z_range[0])
-
-            # 디바이스 배터리
-            battery = max(min(round(battery), battery_range[1]), battery_range[0])
-            battery -= random.randint(0, battery_stddev)
-            deviceName = device[random.randint(0,len(device)-1)]
+            accelerometer_z = max(min(round(accelerometer_z, 17), accelerometer_z_range[1]), accelerometer_z_range[0])          
             
             # 랜덤 더미 데이터 생성
-            activity_data = {
-                'userId' : worker_id[i],
+            health_log_data = { 
+                'userId' : id,
+                'recordTime' : str(datetime.datetime.now()),
+                'lat': round(gps_latitude,6),
+                'lon': round(gps_longitude,6),
                 "accX" : accelerometer_x,
                 "accY" : accelerometer_y,
                 "accZ" : accelerometer_z,
                 "gyroX" : gyrosensor_x,
                 "gyroY" : gyrosensor_y,
                 "gyroZ" : gyrosensor_z,
-            }
-
-            device_data = {
-                'userId' : activity_data['userId'],
-                "deviceName" : deviceName,
-                'battery' : battery,
-            }
-
-            gps_data = {
-                'userId': activity_data['userId'],
-                'lat': gps_latitude,
-                'lon': gps_longitude,
-                'recordTime': str(datetime.datetime.now()),
-            }
-
-            state_data = {
-                'userId': activity_data['userId'],
-                'state' : state
-            }
-            
-            vitalSign_data = {
-                "userId" : activity_data['userId'],
-                "insertTime" : str(datetime.datetime.now()),
                 "heartRate" : heart_rate, 
-                "temp" : body_temperature,
+                "temperature" : round(body_temperature,1),
                 "o2" : oxygen_saturation, 
-                "steps" : step_stride
+                "steps" : step_stride,
+                'status' : status,
+                'accuracy' : accuracy
             }
             
             # Key 중복 허용 
-            message_body = 'Hello'
+            # message_body = 'Hello'
             message_deduplication_id = str(uuid.uuid4())
             
             # 데이터 SQS에 전송
             response = sqs.send_message(
                 QueueUrl=queue_url,
-                MessageBody=json.dumps([activity_data,device_data,gps_data, state_data, vitalSign_data], default=str),
-                MessageGroupId='my-group' + str(activity_data['userId']),
+                MessageBody=json.dumps([health_log_data], default=str),
+                MessageGroupId='my-group' + str(health_log_data['userId']),
                 MessageDeduplicationId=message_deduplication_id,
             )
-            print('1. Sent Activity data: ', activity_data)
-            print('2. Sent Device data: ', device_data)
-            print('3. Sent GPS data: ', gps_data)
-            print('4. Sent State data: ', state_data)
-            print('6. Sent vitalSign data: ', vitalSign_data)
+            print('Sent HealthLog data: ', health_log_data)
 
         # 1초 대기
-        time.sleep(3)
-        # return response
-
-send_sqs_messages()
+        # time.sleep(3)
+        await asyncio.sleep(1)
+        # return health_log_data
